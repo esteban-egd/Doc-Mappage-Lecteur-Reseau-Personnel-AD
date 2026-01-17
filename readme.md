@@ -190,7 +190,7 @@ powershell.exe
 `⚠️` Remplace **STBN-AD01**, par le nom de ta machine.\
 `❌` Ne PAS utiliser *Lecteurs mappés* en parallèle.
 
-
+*Les captures suivantes montrent la configuration attendue :*
 <details>
   <summary>📸︲Paramétrage Script</summary>
 
