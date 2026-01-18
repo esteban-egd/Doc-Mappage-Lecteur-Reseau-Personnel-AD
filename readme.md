@@ -150,6 +150,10 @@ $UserFolder = Join-Path $ShareRoot $env:USERNAME
 # Création du dossier si absent
 if (-not (Test-Path $UserFolder)) {
     New-Item -Path $UserFolder -ItemType Directory -Force | Out-Null
+
+if (-not (Get-PSDrive -Name P -ErrorAction SilentlyContinue)) {
+    New-PSDrive -Name P -PSProvider FileSystem -Root $UserFolder -Persist
+    
 }
 ```
 
