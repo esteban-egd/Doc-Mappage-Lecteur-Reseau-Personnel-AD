@@ -8,11 +8,11 @@ Mettre en place un lecteur réseau personnel `(\Perso$)` mappé automatiquement 
 
 ## Contexte
 
-- Serveur AD / fichiers (exemple) : **STBN-AD01**
-- Domaine : **e-ge.lab**
-- Partage : **Perso\$**
+- Serveur AD / fichiers (exemple) : `STBN-AD01`
+- Domaine : `e-ge.lab`
+- Partage : `Perso\$`
 - Chemin réel sur le serveur : `C:\Shares\Perso`
-- Lettre de lecteur : **P:**
+- Lettre de lecteur : `P:`
 
 ⚠️ **Remplace** `STBN-AD01` **et** `e-ge.lab` **par ton nom de serveur et de domaine.**
 
@@ -33,7 +33,10 @@ Crée un dossier : `C:\Shares\Perso`
 
 ### Autorisations NTFS (paramètres de sécurité avancés)
 
-(Clic droit, `propriétés`, `Sécurité`, puis `Avancé`. Supprime toutex les entrées qui ne figure pas, et ajoute `Utilisateurs authentifiés` puis conserve **uniquement** les entrées suivantes. :
+**Procédure :**
+1. Clic droit sur le dossier `Perso` → `Propriétés` → onglet `Sécurité` → `Avancé`
+2. Supprime toutes les entrées existantes
+3. Ajoute les entrées suivantes :
 
 | Principal                     | Droits                  | S’applique à                          |
 | ----------------------------- | ----------------------- | ------------------------------------- |
@@ -44,7 +47,7 @@ Crée un dossier : `C:\Shares\Perso`
 
 *Les captures suivantes montrent la configuration attendue :*
 <details>
-  <summary>📸︲Cofiguration NTFS du dossier Perso</summary>
+  <summary>📸︲Configuration NTFS du dossier Perso</summary>
 
 ---
 
@@ -65,23 +68,25 @@ Crée un dossier : `C:\Shares\Perso`
 
 ### Détails pour *Utilisateurs authentifiés*
 
-- Parcours du dossier
-- Liste du dossier
-- **Création de dossier / ajout de données**
-- Lecture des attributs
-- Lecture des autorisations
-- **S’applique à : Ce dossier uniquement**
+Autoriser les droits suivants :
+- [x] Parcours du dossier
+- [x] Liste du dossier
+- [x] **Créer des dossiers / ajouter des données**
+- [x] Lire les attributs
+- [x] Lire les autorisations
+
+⚠️ **S'applique à : Ce dossier uniquement** (pas aux sous-dossiers)
 
 
 *Les captures suivantes montrent la configuration attendue :*
 <details>
-  <summary>📸︲Autorisations pour Utilisateur authentifiés</summary>
+  <summary>📸︲Autorisations pour Utilisateurs authentifiés</summary>
 
 ---
 
 <img src="capture/autorisation_utlisateurAuthentifie_perso.jpg" />
 
-*Détails pour Utilisateur authentifiés* 
+*Détails pour Utilisateurs authentifiés* 
 
 
 </details>
@@ -90,14 +95,13 @@ Crée un dossier : `C:\Shares\Perso`
 
 ## 2. Partage du dossier
 
-Partage : **Perso\$**
+**Nom du partage :** `Perso$` (le `$` rend le partage caché)
 
-- Autorisations de partage :
-  - `Authenticated Users` ou `Everyone` → **Contrôle total** 
-  
-Pour ce faire, clique sur `Partage` (dans `Propriétés`), puis `Partage avancé`. Et ensuite, `Autorisations`  \
-
-👉 La sécurité est gérée **uniquement via NTFS**.
+**Procédure :**
+1. Clic droit sur le dossier → `Propriétés` → onglet `Partage` → `Partage avancé`
+2. Donne le nom : `Perso$`
+3. Clic sur `Autorisations`
+4. Assure que `Authenticated Users` a le droit **Contrôle total**
 
 *Les captures suivantes montrent la configuration attendue :*
 <details>
@@ -121,12 +125,18 @@ Pour ce faire, clique sur `Partage` (dans `Propriétés`), puis `Partage avancé
 
 ### Emplacement du script
 
-```text
-\\STBN-AD01\SYSVOL\e-ge.lab\scripts\
-````
-Créé ici le fichier `MapPerso.ps1` 
+Le script doit être placé dans le dossier SYSVOL du domaine, accessible à tous les clients :
 
-`⚠️` Remplace **STBN-AD01**, par le nom de ta machine.
+```text
+\\STBN-AD01\SYSVOL\e-ge.lab\scripts\MapPerso.ps1
+```
+
+**Procédure :**
+1. Connecte-toi au serveur AD
+2. Crée le dossier `scripts` s'il n'existe pas : `\\STBN-AD01\SYSVOL\e-ge.lab\scripts\`
+3. Crée le fichier `MapPerso.ps1` avec le contenu ci-dessous
+
+⚠️ **Remplace `STBN-AD01` par le nom de ton serveur AD et `e-ge.lab` par ton domaine.**
 
 ### Contenu du script
 
@@ -140,11 +150,6 @@ $UserFolder = Join-Path $ShareRoot $env:USERNAME
 # Création du dossier si absent
 if (-not (Test-Path $UserFolder)) {
     New-Item -Path $UserFolder -ItemType Directory -Force | Out-Null
-}
-
-# Mappage du lecteur P:
-if (-not (Get-PSDrive -Name P -ErrorAction SilentlyContinue)) {
-    New-PSDrive -Name P -PSProvider FileSystem -Root $UserFolder -Persist -ErrorAction SilentlyContinue
 }
 ```
 
@@ -164,75 +169,106 @@ if (-not (Get-PSDrive -Name P -ErrorAction SilentlyContinue)) {
 
 ## 4. Configuration de la GPO
 
-### Emplacement exact
+Cette GPO exécutera automatiquement le script PowerShell à chaque connexion utilisateur.
 
-```
-Configuration utilisateur
- → Stratégies
-   → Paramètres Windows
-     → Scripts (ouverture/fermeture de session)
-       → Ouverture de session
-```
+**Créer une nouvelle GPO :**
+1. Ouvre `Gestion des stratégies de groupe` (gpmc.msc)
+2. Fais un clic droit à la racine du domaine
+3. Sélectionne `Créer un objet GPO dans ce domaine, et le lier ici...`
+4. Donne un nom (ex: `Mappage-Lecteur-Perso`)
+5. Clic sur `OK`
 
-### Paramétrage
+**Configurer le script PowerShell :**
 
-- **Script** :
+1. Clic droit sur la GPO nouvellement créée → `Modifier...`
+2. Va à : `Configuration utilisateur` → `Stratégies` → `Paramètres Windows` → `Scripts (ouverture/fermeture de session)` → `Ouverture de session`
+3. Clic droit dans la zone vide → `Ajouter...` 
 
-```
-powershell.exe
-```
 
+**Remplis les champs suivants :**
+
+- **Script** : `powershell.exe`
 - **Paramètres du script** :
+  ```
+  -ExecutionPolicy Bypass -NoProfile -File "\\STBN-AD01\SYSVOL\e-ge.lab\scripts\MapPerso.ps1"
+  ```
 
-```
--ExecutionPolicy Bypass -NoProfile -File "\\STBN-AD01\SYSVOL\e-ge.lab\scripts\MapPerso.ps1"
-```
-`⚠️` Remplace **STBN-AD01**, par le nom de ta machine.\
-`❌` Ne PAS utiliser *Lecteurs mappés* en parallèle.
+⚠️ **Remplace `STBN-AD01` par le nom de ton serveur AD et `e-ge.lab` par ton domaine.**
+
+---
+
+**Configurer le mappage du lecteur :**
+
+Maintenant, ajoute le mappage graphique du lecteur P: pour l'interface utilisateur.
+
+1. Toujours dans l'Éditeur de gestion des stratégies de groupe, va à : `Configuration utilisateur` → `Préférences` → `Paramètres Windows` → `Mappages de lecteurs`
+2. Clic droit dans la zone vide → `Nouveau` → `Lecteur mappé`
+
+**Paramètres à remplir :**
+
+- **Action :** `Mettre à jour`
+- **Emplacement :** `\\STBN-AD01\Perso$\%username%`
+- **Libeller en tant que :** `Perso`
+- **Lettre de lecteur :** `P`
+- **Afficher/Masquer ce lecteur :** `Afficher ce lecteur`
+- **Onglet Commun :** Coche `Exécuter dans le contexte de sécurité de l'utilisateur connecté`
+
+⚠️ **Remplace `STBN-AD01` par le nom de ton serveur.**
+
+---
 
 *Les captures suivantes montrent la configuration attendue :*
 <details>
-  <summary>📸︲Paramétrage Script</summary>
+  <summary>📸︲Paramétrage Script et Mappage de lecteur</summary>
 
 ---
 
 <img src="capture/script_propriete_ouvertureSession.jpg" />
 
-*Paramétrage* 
+*Paramétrage du script PowerShell* 
 
+<img src="capture/mappages_lecteur.png" />
+
+*Ajouter lecteur mappé* 
+
+<img src="capture/mappages_lecteurPropriete.png" />
+
+*Propriétés du lecteur mappé* 
 </details>
-
----
 
 ## 5. Test et validation
 
-1. Sur le serveur :
+**Sur le serveur AD :**
+
+```bash
+gpupdate /force
+````
+
+**Sur le pc client :**
 
 ```bash
 gpupdate /force
 ```
-2. Sur le pc client :
+**et pour se déconnecter :**
 
-```bash
-gpupdate /force
-```
-et pour se déconnecter
 ```bash
 logoff
 ```
 
 ### Résultat attendu
 
-- Le dossier au nom du user, dans `C:\Shares\Perso\...` est créé automatiquement
-- Le lecteur **P:** est mappé sur `\\STBN-AD01\Perso$\test`
-- L’utilisateur n’a accès qu’à **son** dossier
+✔ **Sur le serveur :** Le dossier `C:\Shares\Perso\nom_utilisateur` est créé automatiquement
+
+✔ **Sur le poste client :** Le lecteur `P:` apparaît dans l'Explorateur et pointe vers `\\STBN-AD01\Perso$\nom_utilisateur`
+
+✔ **Isolation des données :** Chaque utilisateur n'a accès qu'à son propre dossier personnel grâce aux autorisations NTFS
 
 ---
 
 ## Conclusion
 
-- `✔` Création automatique du répertoire personnel de l'utilisateur
-- `✔` Mappage du lecteur à chaque connexion
-- `✔` L’accès aux données est strictement limité au dossier personnel de chaque utilisateur, sans visibilité sur les autres répertoires.
+**Le script PowerShell** crée automatiquement le dossier utilisateur s'il n'existe pas.
 
+**Le mappage de lecteur via GPO** assure le mappage du lecteur P: et évite les problèmes liés aux scripts seuls.
 
+**L'isolation des données** est garantie par les autorisations NTFS : chaque utilisateur ne voit et n'accède qu'à son propre dossier personnel.
